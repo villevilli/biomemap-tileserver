@@ -137,53 +137,55 @@ impl<'lock, 'pool> Drop for CacheLock<'lock, 'pool> {
 impl TileProvider for CachePool<'_> {
     fn get_tile(&self, zoom: i32, x: i32, y: i32) -> image::DynamicImage {
         match zoom {
-            0 => self
-                .get(x * 255, 320, y * 255, Scale::Block)
-                .unwrap()
-                .to_image(*COLOR_MAP)
-                .into(),
-            -1 => concat_lower_zoom(zoom, x, y, self).into(),
-            -2 => self
-                .get(x * 255, 320, y * 255, Scale::Quad)
-                .unwrap()
-                .to_image(*COLOR_MAP)
-                .into(),
+            0 => get_image(x, y, self, Scale::Block),
+            -1 => concat_lower_zoom(x, y, self, Scale::Block),
+            -2 => get_image(x, y, self, Scale::Quad),
+            -3 => concat_lower_zoom(x, y, self, Scale::Quad),
+            -4 => get_image(x, y, self, Scale::Chunk),
+            -5 => concat_lower_zoom(x, y, self, Scale::Chunk),
+            -6 => get_image(x, y, self, Scale::QuadChunk),
+            -7 => concat_lower_zoom(x, y, self, Scale::QuadChunk),
+            -8 => get_image(x, y, self, Scale::HalfRegion),
             _ => unimplemented!(),
         }
+        .into()
     }
 }
 
-fn concat_lower_zoom(zoom: i32, x: i32, y: i32, cache_pool: &CachePool) -> RgbImage {
+fn get_image(x: i32, y: i32, cache_pool: &CachePool, scale: Scale) -> RgbImage {
+    cache_pool
+        .get(x * 256, 320, y * 256, scale)
+        .unwrap()
+        .to_image(*COLOR_MAP)
+}
+
+fn concat_lower_zoom(x: i32, y: i32, cache_pool: &CachePool, scale: Scale) -> RgbImage {
     let mut img = RgbImage::new(256, 256);
 
-    for img_x in 0..=zoom.abs() {
-        for img_y in 0..=(zoom.abs()) {
+    for img_x in 0..=1 {
+        for img_y in 0..=1 {
             dbg!(img_x);
             dbg!(img_y);
             let cache = cache_pool
                 .get(
-                    ((x * 255) * (zoom.abs() + 1)) + (img_x * 255),
+                    ((x * 255) * (2)) + (img_x * 255),
                     320,
-                    ((y * 255) * (zoom.abs() + 1)) + (img_y * 255),
-                    Scale::Block,
+                    ((y * 255) * (2)) + (img_y * 255),
+                    scale,
                 )
                 .unwrap();
 
-            for sub_img_x in 0..(256 / (zoom.abs() + 1)) {
-                for sub_img_y in 0..(256 / (zoom.abs() + 1)) {
+            for sub_img_x in 0..(256 / (2)) {
+                for sub_img_y in 0..(256 / (2)) {
                     //dbg!(x);
                     //dbg!(y);
 
                     *img.get_pixel_mut(
-                        (sub_img_x + ((256 / (zoom.abs() + 1)) * img_x)) as u32,
-                        (sub_img_y + ((256 / (zoom.abs() + 1)) * img_y)) as u32,
+                        (sub_img_x + ((256 / (2)) * img_x)) as u32,
+                        sub_img_y + (256 / (2) * img_y) as u32,
                     ) = Rgb::from(
                         COLOR_MAP[cache
-                            .biome_at(
-                                (sub_img_x * (zoom.abs() + 1)) as u32,
-                                0,
-                                (sub_img_y * (zoom.abs() + 1)) as u32,
-                            )
+                            .biome_at((sub_img_x * (2)) as u32, 0, sub_img_y * (2))
                             .unwrap()],
                     );
                 }
