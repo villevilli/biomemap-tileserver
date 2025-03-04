@@ -15,19 +15,6 @@ use crate::tileprovider::TileProvider;
 
 static COLOR_MAP: LazyLock<BiomeColorMap> = std::sync::LazyLock::new(BiomeColorMap::new);
 
-/*
-impl TileProvider for Cache<'_> {
-    fn get_tile(&mut self, zoom: i32, x: i32, y: i32) -> image::DynamicImage {
-        let x = x * 256;
-        let z = y * 256;
-
-        self.move_cache(x, 320, z).unwrap();
-        self.to_image(*COLOR_MAP).into()
-    }
-}
-
-*/
-
 pub struct CachePool<'pool> {
     generator: &'pool Generator,
     caches: Mutex<BTreeMap<Scale, Vec<Cache<'pool>>>>,
