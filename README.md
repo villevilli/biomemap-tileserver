@@ -1,6 +1,7 @@
 # Biomemap-tileserver
 Simple osm rastertile server which generates osm compatible
-tiles off of a minecraft seed, made with rust.
+tiles off of a minecraft seed, made with rust. Generates the
+tiles using cubiomes.
 
 # Usage
 You could try running it, it'll probably work lol. Binds
