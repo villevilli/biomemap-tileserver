@@ -1,0 +1,6 @@
+# Rust Build
+/target
+
+# Cargo Flamgraph
+perf*
+flamegraph.svg

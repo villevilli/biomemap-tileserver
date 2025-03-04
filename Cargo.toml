@@ -1,0 +1,11 @@
+[package]
+name = "biomemap-tileserver"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+image = "0.25"
+actix-web = "4.0"
+cubiomes = "0.3"
+tokio = "1.0"
+tokio-stream = "0.1"
