@@ -32,9 +32,11 @@ async fn main() -> std::io::Result<()> {
 
         let cache_pool = web::Data::new(CachePool::new(g));
 
-        App::new()
-            .app_data(cache_pool)
-            .service((index, get_biome_tile))
+        App::new().app_data(cache_pool).service((
+            get_biome_tile,
+            actix_files::Files::new("/", concat!(env!("OUT_DIR"), "/pages"))
+                .index_file("index.html"),
+        ))
     })
     .bind(address)?
     .run();
