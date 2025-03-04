@@ -151,22 +151,17 @@ fn concat_lower_zoom(x: i32, y: i32, cache_pool: &CachePool, scale: Scale) -> Rg
 
     for img_x in 0..=1 {
         for img_y in 0..=1 {
-            dbg!(img_x);
-            dbg!(img_y);
             let cache = cache_pool
                 .get(
-                    ((x * 255) * (2)) + (img_x * 255),
+                    ((x * 256) * (2)) + (img_x * 256),
                     320,
-                    ((y * 255) * (2)) + (img_y * 255),
+                    ((y * 256) * (2)) + (img_y * 256),
                     scale,
                 )
                 .unwrap();
 
             for sub_img_x in 0..(256 / (2)) {
                 for sub_img_y in 0..(256 / (2)) {
-                    //dbg!(x);
-                    //dbg!(y);
-
                     *img.get_pixel_mut(
                         (sub_img_x + ((256 / (2)) * img_x)) as u32,
                         sub_img_y + (256 / (2) * img_y) as u32,
