@@ -9,4 +9,5 @@ leaflet.tileLayer('http://localhost:3000/biomemap/{z}/{x}/{y}.png', {
     minNativeZoom: -8,
     maxZoom: 17,
     minZoom: -10,
+    className: 'noblur'
 }).addTo(map);
