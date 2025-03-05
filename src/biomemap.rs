@@ -173,8 +173,46 @@ fn upsacale_blockscale(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> Rgb
     );
 
     if zoom > 2 {
+        let heightmap = cache_pool
+            .as_generatr_ref()
+            .generate_heightmap_image(
+                x * (size / 4) as i32 - 1,
+                y * (size / 4) as i32 - 1,
+                ((size / 4) + 1).max(2),
+                ((size / 4) + 1).max(2),
+                0.0,
+                320.0,
+            )
+            .unwrap();
+        dbg!(heightmap.dimensions());
+
         img.enumerate_pixels_mut().for_each(|(x, y, pixel)| {
-            if x % tilecount == 0 || y % tilecount == 0 {
+            let divider = 4 * 2_u32.pow(zoom as u32);
+
+            let (hmx, hmy) = ((x / divider), (y / divider));
+
+            if x % tilecount == 1 {
+                match heightmap.get_pixel(hmx + 1, hmy)[0].cmp(&heightmap.get_pixel(hmx, hmy)[0]) {
+                    std::cmp::Ordering::Less => {
+                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_sub(16))
+                    }
+                    std::cmp::Ordering::Equal => (),
+                    std::cmp::Ordering::Greater => {
+                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_add(16))
+                    }
+                }
+            } else if y % tilecount == 1 {
+                match heightmap.get_pixel(hmx, hmy + 1)[0].cmp(&heightmap.get_pixel(hmx, hmy)[0]) {
+                    std::cmp::Ordering::Less => {
+                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_sub(16))
+                    }
+                    std::cmp::Ordering::Equal => (),
+                    std::cmp::Ordering::Greater => {
+                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_add(16))
+                    }
+                }
+            }
+            if x % (tilecount * 8) == 0 || y % (tilecount * 8) == 0 {
                 pixel.0 = [0; 3]
             }
         });

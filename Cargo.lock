@@ -607,9 +607,9 @@ dependencies = [
 
 [[package]]
 name = "cubiomes"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a821b1dd6f81e775567bca90cbf779a0602cd425db80287dcf8e2103a249f7a0"
+checksum = "920db9a7b54c2a03712298e517e02f54a0991e3e312c7e26be99a04d75ea5755"
 dependencies = [
  "bitflags 2.9.0",
  "cubiomes-sys",
