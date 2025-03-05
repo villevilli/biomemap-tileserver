@@ -1,1 +1,13 @@
-{}
+{
+    "include": [
+        "src/pages/**/*"
+    ],
+    "compilerOptions": {
+        "module": "Preserve",
+        "paths": {
+            "https://unpkg.com/leaflet/dist/leaflet-src.esm.js": [
+                "./node_modules/@types/leaflet/index.d.ts"
+            ]
+        }
+    }
+}

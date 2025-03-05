@@ -1,0 +1,21 @@
+{
+  "name": "biomemap-tileserver",
+  "version": "0.1.0",
+  "description": "Simple osm rastertile server which generates osm compatible tiles off of a minecraft seed, made with rust. Generates the tiles using cubiomes.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/villevilli/biomemap-tileserver.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/villevilli/biomemap-tileserver/issues"
+  },
+  "homepage": "https://github.com/villevilli/biomemap-tileserver#readme",
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.16"
+  }
+}
