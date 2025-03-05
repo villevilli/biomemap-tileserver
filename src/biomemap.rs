@@ -9,7 +9,7 @@ use cubiomes::{
     colors::BiomeColorMap,
     generator::{Cache, Generator, Range, Scale},
 };
-use image::{Rgb, RgbImage};
+use image::{Rgb, RgbImage, imageops::resize};
 
 use crate::tileprovider::TileProvider;
 
@@ -26,6 +26,10 @@ impl<'pool> CachePool<'pool> {
             generator,
             caches: Mutex::new(BTreeMap::new()),
         }
+    }
+
+    pub fn as_generatr_ref(&self) -> &Generator {
+        self.generator
     }
 
     pub fn get<'lock>(
@@ -122,21 +126,61 @@ impl<'lock, 'pool> Drop for CacheLock<'lock, 'pool> {
 }
 
 impl TileProvider for CachePool<'_> {
-    fn get_tile(&self, zoom: i32, x: i32, y: i32) -> image::DynamicImage {
-        match zoom {
-            0 => get_image(x, y, self, Scale::Block),
-            -1 => concat_lower_zoom(x, y, self, Scale::Block),
-            -2 => get_image(x, y, self, Scale::Quad),
-            -3 => concat_lower_zoom(x, y, self, Scale::Quad),
-            -4 => get_image(x, y, self, Scale::Chunk),
-            -5 => concat_lower_zoom(x, y, self, Scale::Chunk),
-            -6 => get_image(x, y, self, Scale::QuadChunk),
-            -7 => concat_lower_zoom(x, y, self, Scale::QuadChunk),
-            -8 => get_image(x, y, self, Scale::HalfRegion),
-            _ => unimplemented!(),
-        }
-        .into()
+    fn get_tile(&self, zoom: i32, x: i32, y: i32) -> Option<image::DynamicImage> {
+        Some(
+            match zoom {
+                -8 => get_image(x, y, self, Scale::HalfRegion),
+                -7 => concat_lower_zoom(x, y, self, Scale::QuadChunk),
+                -6 => get_image(x, y, self, Scale::QuadChunk),
+                -5 => concat_lower_zoom(x, y, self, Scale::Chunk),
+                -4 => get_image(x, y, self, Scale::Chunk),
+                -3 => concat_lower_zoom(x, y, self, Scale::Quad),
+                -2 => get_image(x, y, self, Scale::Quad),
+                -1 => concat_lower_zoom(x, y, self, Scale::Block),
+                0 => get_image(x, y, self, Scale::Block),
+                1..=8 => upsacale_blockscale(x, y, zoom, self),
+                _ => return None,
+            }
+            .into(),
+        )
     }
+}
+
+fn upsacale_blockscale(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> RgbImage {
+    let tilecount = 2_u32.pow(zoom as u32);
+    let mut img;
+
+    let size = 256 / tilecount;
+
+    img = resize(
+        &Cache::new(
+            cache_pool.as_generatr_ref(),
+            Range {
+                x: x * size as i32,
+                y: 320,
+                z: y * size as i32,
+                size_x: size,
+                size_y: 0,
+                size_z: size,
+                scale: Scale::Block,
+            },
+        )
+        .unwrap()
+        .to_image(*COLOR_MAP),
+        256,
+        256,
+        image::imageops::FilterType::Nearest,
+    );
+
+    if zoom > 2 {
+        img.enumerate_pixels_mut().for_each(|(x, y, pixel)| {
+            if x % tilecount == 0 || y % tilecount == 0 {
+                pixel.0 = [0; 3]
+            }
+        });
+    }
+
+    img
 }
 
 fn get_image(x: i32, y: i32, cache_pool: &CachePool, scale: Scale) -> RgbImage {

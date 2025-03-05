@@ -59,15 +59,15 @@ async fn get_biome_tile(
     cache_pool: Data<CachePool<'_>>,
 ) -> impl Responder {
     let (zoom, x, y) = path.into_inner();
+    let Some(tile) = cache_pool.get_tile(zoom, x, y) else {
+        return HttpResponse::NotFound()
+            .content_type(ContentType::png())
+            .body(include_bytes!("notile.png").as_slice());
+    };
+
     let mut buf = Vec::new();
 
-    if cache_pool
-        .get_tile(zoom, x, y)
-        .write_with_encoder(PngEncoder::new(&mut buf))
-        .is_err()
-    {
-        return HttpResponse::InternalServerError().finish();
-    }
+    tile.write_with_encoder(PngEncoder::new(&mut buf)).unwrap();
 
     HttpResponse::Ok()
         .content_type(ContentType::png())

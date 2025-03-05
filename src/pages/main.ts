@@ -28,7 +28,6 @@ let mousePosControl = new MousePositionControl
 map.addControl(mousePosControl)
 
 leaflet.tileLayer('http://localhost:3000/biomemap/{z}/{x}/{y}.png', {
-    maxNativeZoom: 0,
     minNativeZoom: -8,
     maxZoom: 17,
     minZoom: -10,
