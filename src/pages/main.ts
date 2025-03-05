@@ -4,26 +4,28 @@ let map = leaflet.map('map', {
     crs: leaflet.CRS.Simple,
 }).setView([0.0, 0.0], 0);
 
-let MousePositionControl = leaflet.Control.extend({
-    _container: null,
-    options: {
-        position: 'bottomleft'
-    },
+class MousePositionControl extends leaflet.Control {
+    element: HTMLElement;
 
-    onAdd: function (map: leaflet.Map) {
-        var latlng = leaflet.DomUtil.create('div', 'mouseposition leaflet-control-attribution');
-        this._latlng = latlng;
-        return latlng;
-    },
+    constructor() {
+        super({ position: "bottomleft" })
 
-    updateHTML: function (latlng: leaflet.LatLng) {
-        this._latlng.innerHTML = `x: ${Math.round(latlng.lat)} z: ${Math.round(latlng.lng)}`;
     }
-});
 
-let control = new MousePositionControl
+    onAdd(map: leaflet.Map): HTMLElement {
+        var latlng = leaflet.DomUtil.create("div", 'mouseposition leaflet-control-attribution');
+        this.element = latlng;
+        return latlng;
+    }
 
-map.addControl(control)
+    update(latlng: leaflet.LatLng) {
+        this.element.innerHTML = `x: ${Math.round(latlng.lng)} z: ${Math.round(latlng.lat)}`;
+    }
+}
+
+let mousePosControl = new MousePositionControl
+
+map.addControl(mousePosControl)
 
 leaflet.tileLayer('http://localhost:3000/biomemap/{z}/{x}/{y}.png', {
     maxNativeZoom: 0,
@@ -34,5 +36,5 @@ leaflet.tileLayer('http://localhost:3000/biomemap/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 map.on("mousemove", (e) => {
-    control.updateHTML(e.latlng)
+    mousePosControl.update(e.latlng)
 })
