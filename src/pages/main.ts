@@ -18,14 +18,14 @@ class MousePositionControl extends leaflet.Control {
         return latlng;
     }
 
-    update(latlng: leaflet.LatLng) {
-        this.element.innerHTML = `x: ${Math.round(latlng.lng)} z: ${Math.round(latlng.lat)}`;
+    update(latlng: leaflet.LatLng, zoom: number) {
+        this.element.innerHTML = `x: ${Math.round(latlng.lng)} z: ${Math.round(latlng.lat)} zoom: ${zoom}`;
     }
 }
 
-let mousePosControl = new MousePositionControl
+let mousePosControl = new MousePositionControl;
 
-map.addControl(mousePosControl)
+map.addControl(mousePosControl);
 
 leaflet.tileLayer('http://localhost:3000/biomemap/{z}/{x}/{y}.png', {
     minNativeZoom: -8,
@@ -35,5 +35,6 @@ leaflet.tileLayer('http://localhost:3000/biomemap/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 map.on("mousemove", (e) => {
-    mousePosControl.update(e.latlng)
+    let zoom = map.getZoom();
+    mousePosControl.update(e.latlng, zoom);
 })
