@@ -9,7 +9,7 @@ use cubiomes::{
     colors::BiomeColorMap,
     generator::{Cache, Generator, Range, Scale},
 };
-use image::{Rgb, RgbImage, imageops::resize};
+use image::{GrayImage, Pixel, Rgb, RgbImage, imageops::resize};
 
 use crate::tileprovider::TileProvider;
 
@@ -172,53 +172,81 @@ fn upsacale_blockscale(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> Rgb
         image::imageops::FilterType::Nearest,
     );
 
-    if zoom > 2 {
+    if zoom >= 0 {
         let heightmap = cache_pool
             .as_generatr_ref()
             .generate_heightmap_image(
                 x * (size / 4) as i32 - 1,
                 y * (size / 4) as i32 - 1,
-                ((size / 4) + 1).max(2),
-                ((size / 4) + 1).max(2),
+                ((size / 4) + 3).max(3),
+                ((size / 4) + 3).max(3),
                 0.0,
                 320.0,
             )
             .unwrap();
-        dbg!(heightmap.dimensions());
 
         img.enumerate_pixels_mut().for_each(|(x, y, pixel)| {
             let divider = 4 * 2_u32.pow(zoom as u32);
 
-            let (hmx, hmy) = ((x / divider), (y / divider));
+            let (hmx, hmy) = (((x / divider) + 1), ((y / divider) + 1));
 
-            if x % tilecount == 1 {
-                match heightmap.get_pixel(hmx + 1, hmy)[0].cmp(&heightmap.get_pixel(hmx, hmy)[0]) {
-                    std::cmp::Ordering::Less => {
-                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_sub(16))
-                    }
-                    std::cmp::Ordering::Equal => (),
-                    std::cmp::Ordering::Greater => {
-                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_add(16))
-                    }
+            let contour_strenght = 32;
+
+            #[allow(clippy::collapsible_if)]
+            if x % (divider) == 0 {
+                if height_deviates_x(hmx - 1, hmy, &heightmap) == Direction::Down {
+                    shift_lightness(pixel, contour_strenght);
+                } else if height_deviates_x(hmx - 1, hmy, &heightmap) == Direction::Up {
+                    shift_lightness(pixel, -contour_strenght);
                 }
-            } else if y % tilecount == 1 {
-                match heightmap.get_pixel(hmx, hmy + 1)[0].cmp(&heightmap.get_pixel(hmx, hmy)[0]) {
-                    std::cmp::Ordering::Less => {
-                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_sub(16))
-                    }
-                    std::cmp::Ordering::Equal => (),
-                    std::cmp::Ordering::Greater => {
-                        pixel.0.iter_mut().for_each(|n| *n = n.saturating_add(16))
-                    }
+            } else if y % (divider) == 0 {
+                if height_deviates_y(hmx, hmy, &heightmap) == Direction::Down {
+                    shift_lightness(pixel, -contour_strenght);
+                } else if height_deviates_y(hmx, hmy, &heightmap) == Direction::Up {
+                    shift_lightness(pixel, contour_strenght);
                 }
             }
-            if x % (tilecount * 8) == 0 || y % (tilecount * 8) == 0 {
-                pixel.0 = [0; 3]
-            }
+            //if x == 0 || y == 0 {
+            //    pixel.0 = [0; 3]
+            //}
         });
     }
 
     img
+}
+
+fn shift_lightness(pixel: &mut Rgb<u8>, shift_amount: i8) {
+    pixel.apply(|n| n.saturating_add_signed(shift_amount));
+}
+
+#[derive(PartialEq, Eq)]
+enum Direction {
+    Up,
+    Flat,
+    Down,
+}
+
+fn height_deviates_x(hmx: u32, hmy: u32, heightmap: &GrayImage) -> Direction {
+    let cmp_point = heightmap.get_pixel(hmx, hmy).0[0];
+    let left_point = heightmap.get_pixel(hmx + 1, hmy).0[0];
+    dir(left_point, cmp_point)
+}
+
+fn height_deviates_y(hmx: u32, hmy: u32, heightmap: &GrayImage) -> Direction {
+    let cmp_point = heightmap.get_pixel(hmx, hmy).0[0];
+    let up_point = heightmap.get_pixel(hmx, hmy - 1).0[0];
+    dir(up_point, cmp_point)
+}
+
+fn dir(x1: u8, x2: u8) -> Direction {
+    if x1 == x2 {
+        Direction::Flat
+    } else {
+        match x1 > x2 {
+            true => Direction::Down,
+            false => Direction::Up,
+        }
+    }
 }
 
 fn get_image(x: i32, y: i32, cache_pool: &CachePool, scale: Scale) -> RgbImage {
