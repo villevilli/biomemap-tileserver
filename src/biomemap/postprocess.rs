@@ -3,10 +3,10 @@ use std::sync::LazyLock;
 use cubiomes::{
     colors::BiomeColorMap,
     generator::{Cache, Range, Scale},
-    noise::SurfaceNoiseRelease,
+    noise::{BiomeNoise, SurfaceNoiseRelease},
 };
 use image::{
-    GenericImage, GrayImage, Pixel, Rgb, RgbImage,
+    GrayImage, Pixel, Rgb, RgbImage,
     imageops::{FilterType::Nearest, resize},
 };
 
@@ -89,28 +89,6 @@ pub fn upsacale_blockscale(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) ->
     img
 }
 
-pub fn draw_shading(tile: &mut RgbImage, x: i32, y: i32, zoom: i32, cache_pool: &CachePool) {
-    let tilecount = 2_u32.pow(zoom.unsigned_abs());
-
-    let size = if zoom.is_negative() {
-        256 * tilecount
-    } else {
-        256 / tilecount
-    };
-
-    let heightmap = generate_heightmap(x, y, zoom, cache_pool);
-
-    raw_draw_shading(&heightmap, tile, zoom, 24);
-
-    let frequency = 15;
-
-    draw_contours(
-        &heightmap,
-        (0..=(u8::MAX)).step_by(15).map(|x| x + (frequency % 15)),
-        tile,
-    );
-}
-
 pub fn draw_contours<T>(heightmap: &GrayImage, levels: T, tile: &mut RgbImage)
 where
     T: Iterator<Item = u8>,
@@ -138,10 +116,11 @@ pub fn generate_heightmap(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> 
 
     let scale = 2_u32.pow((rel_zoom).unsigned_abs());
 
-    let noise = SurfaceNoiseRelease::new(
+    let noise: BiomeNoise = SurfaceNoiseRelease::new(
         cache_pool.as_generatr_ref().dimension(),
         cache_pool.as_generatr_ref().seed(),
-    );
+    )
+    .into();
 
     if !rel_zoom.is_negative() {
         return resize(
@@ -154,7 +133,7 @@ pub fn generate_heightmap(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> 
                     (256 / scale) + 3,
                     0.0,
                     320.0,
-                    noise.into(),
+                    &noise,
                 )
                 .unwrap(),
             256 + 3,
@@ -171,7 +150,7 @@ pub fn generate_heightmap(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> 
                 (img_y as i32) + (y * scale as i32),
                 1,
                 1,
-                noise.into(),
+                &noise,
             )
             .unwrap()[0]
             * (320.0 / 255.0))
@@ -194,7 +173,7 @@ fn higher_lower(map: &[u8], targe_height: u8, buf: &mut Vec<bool>) {
 /// Draws contour lines onto the given image at the zoom level.
 ///
 /// Heightmap must be big enough and should begin one left and end one right of the are in the image
-fn raw_draw_shading(heightmap: &GrayImage, tile: &mut RgbImage, zoom: i32, strenght: i8) {
+pub fn draw_shading(heightmap: &GrayImage, tile: &mut RgbImage, strenght: i8) {
     let tile_scale = 1;
     let (w, h) = tile.dimensions();
 
