@@ -3,8 +3,12 @@ use std::sync::LazyLock;
 use cubiomes::{
     colors::BiomeColorMap,
     generator::{Cache, Range, Scale},
+    noise::SurfaceNoiseRelease,
 };
-use image::{GrayImage, Rgb, RgbImage, imageops::resize};
+use image::{
+    GenericImage, GrayImage, Pixel, Rgb, RgbImage,
+    imageops::{FilterType::Nearest, resize},
+};
 
 use super::CachePool;
 
@@ -94,76 +98,116 @@ pub fn draw_shading(tile: &mut RgbImage, x: i32, y: i32, zoom: i32, cache_pool: 
         256 / tilecount
     };
 
-    let heightmap = cache_pool
-        .as_generatr_ref()
-        .generate_heightmap_image(
-            x * (size / 4) as i32 - 1,
-            y * (size / 4) as i32 - 1,
-            ((size / 4) + 3).max(3),
-            ((size / 4) + 3).max(3),
-            0.0,
-            320.0,
-        )
-        .unwrap();
+    let heightmap = generate_heightmap(x, y, zoom, cache_pool);
 
     raw_draw_shading(&heightmap, tile, zoom, 24);
+
+    let frequency = 15;
+
+    draw_contours(
+        &heightmap,
+        (0..=(u8::MAX)).step_by(15).map(|x| x + (frequency % 15)),
+        tile,
+    );
+}
+
+pub fn draw_contours<T>(heightmap: &GrayImage, levels: T, tile: &mut RgbImage)
+where
+    T: Iterator<Item = u8>,
+{
+    let mut map: Vec<bool> = Vec::new();
+    let w = heightmap.width() as usize;
+
+    for i in levels {
+        higher_lower(heightmap, i, &mut map);
+
+        tile.enumerate_pixels_mut().for_each(|(x, y, pixel)| {
+            let this_pixel = map[calc_2d_index(x as usize + 1, w, y as usize + 1)];
+            let above_pixel = map[calc_2d_index(x as usize + 1, w, y as usize)];
+            let left_pixel = map[calc_2d_index(x as usize, w, y as usize + 1)];
+
+            if this_pixel != above_pixel || this_pixel != left_pixel {
+                pixel.apply(|_| 0);
+            }
+        });
+    }
+}
+
+pub fn generate_heightmap(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> GrayImage {
+    let rel_zoom = zoom + 2;
+
+    let scale = 2_u32.pow((rel_zoom).unsigned_abs());
+
+    let noise = SurfaceNoiseRelease::new(
+        cache_pool.as_generatr_ref().dimension(),
+        cache_pool.as_generatr_ref().seed(),
+    );
+
+    if !rel_zoom.is_negative() {
+        return resize(
+            &cache_pool
+                .as_generatr_ref()
+                .generate_heightmap_image(
+                    ((x * 256) / scale as i32) - 1,
+                    ((y * 256) / scale as i32) - 1,
+                    (256 / scale) + 3,
+                    (256 / scale) + 3,
+                    0.0,
+                    320.0,
+                    noise.into(),
+                )
+                .unwrap(),
+            256 + 3,
+            256 + 3,
+            Nearest,
+        );
+    }
+
+    GrayImage::from_fn(256 + 2, 256 + 2, |img_x, img_y| {
+        [((cache_pool
+            .as_generatr_ref()
+            .approx_surface_noise(
+                (img_x as i32) + (x * scale as i32),
+                (img_y as i32) + (y * scale as i32),
+                1,
+                1,
+                noise.into(),
+            )
+            .unwrap()[0]
+            * (320.0 / 255.0))
+            .clamp(0.0, 255.0) as u8)]
+        .into()
+    })
+}
+
+fn calc_2d_index(x: usize, width: usize, y: usize) -> usize {
+    y * width + x
+}
+
+fn higher_lower(map: &[u8], targe_height: u8, buf: &mut Vec<bool>) {
+    buf.reserve(map.len());
+    buf.clear();
+
+    map.iter().for_each(|h| buf.push(*h < targe_height));
 }
 
 /// Draws contour lines onto the given image at the zoom level.
 ///
 /// Heightmap must be big enough and should begin one left and end one right of the are in the image
 fn raw_draw_shading(heightmap: &GrayImage, tile: &mut RgbImage, zoom: i32, strenght: i8) {
-    let w;
-    let h;
-    let tile_scale;
-    let rel_zoom = zoom + 2;
-
-    let heightmap_to_img_scaler = 2_u32.pow(rel_zoom.unsigned_abs());
-
-    if rel_zoom.is_positive() {
-        // Heightmap is smaller than tile
-        tile_scale = heightmap_to_img_scaler;
-        w = heightmap.width() - 2;
-        h = heightmap.width() - 2;
-    } else {
-        // Heightmap is bigger than tile
-        tile_scale = 1;
-        (w, h) = tile.dimensions();
-    }
+    let tile_scale = 1;
+    let (w, h) = tile.dimensions();
 
     for x in 0..h {
         for y in 0..w {
-            let tile_x: u32;
-            let tile_y: u32;
-            let hmx;
-            let hmy;
-            let stroke;
+            let stroke = strenght;
 
-            if rel_zoom.is_positive() {
-                // Heightmap is smaller than tile
-                tile_x = (x) * heightmap_to_img_scaler;
-                tile_y = (y) * heightmap_to_img_scaler;
-
-                hmx = x + 1;
-                hmy = y + 1;
-
-                stroke = strenght;
-            } else {
-                // Heightmap is bigger than tile
-                hmx = ((x) * heightmap_to_img_scaler) + 1;
-                hmy = ((y) * heightmap_to_img_scaler) + 1;
-
-                tile_x = x;
-                tile_y = y;
-
-                stroke = strenght / (heightmap_to_img_scaler as i8);
-            }
-            match height_change_x(hmx, hmy, heightmap) {
+            match height_change_x(x, y, heightmap) {
                 Direction::Higher(n) => {
                     shift_lightness(
                         tile,
-                        tile_x,
-                        tile_y,
+                        x,
+                        y,
                         tile_scale,
                         tile_scale,
                         -height_diff_shade_calculator(stroke, n),
@@ -172,8 +216,8 @@ fn raw_draw_shading(heightmap: &GrayImage, tile: &mut RgbImage, zoom: i32, stren
                 Direction::Lower(n) => {
                     shift_lightness(
                         tile,
-                        tile_x,
-                        tile_y,
+                        x,
+                        y,
                         tile_scale,
                         tile_scale,
                         height_diff_shade_calculator(stroke, n),
@@ -182,12 +226,12 @@ fn raw_draw_shading(heightmap: &GrayImage, tile: &mut RgbImage, zoom: i32, stren
                 Direction::Flat => (),
             }
 
-            match height_change_y(hmx, hmy, heightmap) {
+            match height_change_y(x, y, heightmap) {
                 Direction::Higher(n) => {
                     shift_lightness(
                         tile,
-                        tile_x,
-                        tile_y,
+                        x,
+                        y,
                         tile_scale,
                         tile_scale,
                         -height_diff_shade_calculator(stroke, n),
@@ -196,8 +240,8 @@ fn raw_draw_shading(heightmap: &GrayImage, tile: &mut RgbImage, zoom: i32, stren
                 Direction::Lower(n) => {
                     shift_lightness(
                         tile,
-                        tile_x,
-                        tile_y,
+                        x,
+                        y,
                         tile_scale,
                         tile_scale,
                         height_diff_shade_calculator(stroke, n),
@@ -241,15 +285,15 @@ enum Direction {
 
 /// Gets heightmap change from this and left (eg is left higher flat or lower than self)
 fn height_change_x(hmx: u32, hmy: u32, heightmap: &GrayImage) -> Direction {
-    let cmp_point = heightmap.get_pixel(hmx, hmy).0[0];
-    let left_point = heightmap.get_pixel(hmx - 1, hmy).0[0];
+    let cmp_point = heightmap.get_pixel(hmx + 1, hmy).0[0];
+    let left_point = heightmap.get_pixel(hmx, hmy).0[0];
     dir(left_point, cmp_point)
 }
 
 /// Gets heightmap change from this and above (eg is abover higher flat or lower than self)
 fn height_change_y(hmx: u32, hmy: u32, heightmap: &GrayImage) -> Direction {
-    let cmp_point = heightmap.get_pixel(hmx, hmy).0[0];
-    let up_point = heightmap.get_pixel(hmx, hmy - 1).0[0];
+    let cmp_point = heightmap.get_pixel(hmx, hmy + 1).0[0];
+    let up_point = heightmap.get_pixel(hmx, hmy).0[0];
     dir(up_point, cmp_point)
 }
 

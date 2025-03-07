@@ -8,7 +8,7 @@ use std::{
 };
 
 use cubiomes::generator::{Cache, Generator, Range, Scale};
-use postprocess::{concat_lower_zoom, draw_shading, get_image, upsacale_blockscale};
+use postprocess::{concat_lower_zoom, draw_contours, draw_shading, get_image, upsacale_blockscale};
 
 use crate::tileprovider::TileProvider;
 
@@ -140,6 +140,7 @@ impl TileProvider for CachePool<'_> {
 
         if zoom >= -3 {
             draw_shading(&mut tile, x, y, zoom, self);
+        } else {
         }
 
         Some(tile.into())
