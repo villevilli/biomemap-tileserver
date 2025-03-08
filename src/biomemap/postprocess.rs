@@ -1,14 +1,14 @@
-use std::sync::LazyLock;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::LazyLock,
+};
 
 use cubiomes::{
     colors::BiomeColorMap,
     generator::{Cache, Range, Scale},
     noise::{BiomeNoise, SurfaceNoiseRelease},
 };
-use image::{
-    GrayImage, Pixel, Rgb, RgbImage,
-    imageops::{FilterType::Nearest, resize},
-};
+use image::{GrayImage, ImageBuffer, Rgb, RgbImage, imageops::resize};
 
 use super::CachePool;
 
@@ -89,9 +89,15 @@ pub fn upsacale_blockscale(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) ->
     img
 }
 
-pub fn draw_contours<T>(heightmap: &GrayImage, levels: T, tile: &mut RgbImage)
-where
-    T: Iterator<Item = u8>,
+pub fn draw_contours<Levels, Pixel, Container>(
+    heightmap: &GrayImage,
+    levels: Levels,
+    tile: &mut ImageBuffer<Pixel, Container>,
+) where
+    Levels: Iterator<Item = u8>,
+    Pixel: image::Pixel,
+    Container: Deref<Target = [Pixel::Subpixel]> + DerefMut,
+    Pixel::Subpixel: From<u8>,
 {
     let mut map: Vec<bool> = Vec::new();
     let w = heightmap.width() as usize;
@@ -105,7 +111,7 @@ where
             let left_pixel = map[calc_2d_index(x as usize, w, y as usize + 1)];
 
             if this_pixel != above_pixel || this_pixel != left_pixel {
-                pixel.apply(|_| 0);
+                pixel.apply_with_alpha(|_| 0.into(), |_| 255.into());
             }
         });
     }
@@ -122,32 +128,33 @@ pub fn generate_heightmap(x: i32, y: i32, zoom: i32, cache_pool: &CachePool) -> 
     )
     .into();
 
-    if !rel_zoom.is_negative() {
-        return resize(
-            &cache_pool
-                .as_generatr_ref()
-                .generate_heightmap_image(
-                    ((x * 256) / scale as i32) - 1,
-                    ((y * 256) / scale as i32) - 1,
-                    (256 / scale) + 3,
-                    (256 / scale) + 3,
-                    0.0,
-                    320.0,
-                    &noise,
-                )
-                .unwrap(),
-            256 + 3,
-            256 + 3,
-            Nearest,
-        );
+    let scaled_x;
+    let scaled_y;
+
+    if rel_zoom.is_negative() {
+        scaled_x = x * scale as i32;
+        scaled_y = y * scale as i32;
+    } else {
+        scaled_x = x / scale as i32;
+        scaled_y = y / scale as i32;
     }
 
     GrayImage::from_fn(256 + 2, 256 + 2, |img_x, img_y| {
+        let offset_x;
+        let offset_y;
+
+        if rel_zoom.is_negative() {
+            offset_x = img_x * scale;
+            offset_y = img_y * scale;
+        } else {
+            offset_x = img_x / scale;
+            offset_y = img_y / scale;
+        }
         [((cache_pool
             .as_generatr_ref()
             .approx_surface_noise(
-                (img_x as i32) + (x * scale as i32),
-                (img_y as i32) + (y * scale as i32),
+                offset_x as i32 + (scaled_x),
+                offset_y as i32 + (scaled_y),
                 1,
                 1,
                 &noise,

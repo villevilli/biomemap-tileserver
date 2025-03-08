@@ -5,7 +5,7 @@ use actix_web::{
     http::header::ContentType,
     web::{self, Data},
 };
-use biomemap::CachePool;
+use biomemap::{CachePool, ContourLines};
 use cubiomes::{
     enums::MCVersion,
     generator::{Generator, GeneratorFlags},
@@ -34,6 +34,8 @@ async fn main() -> std::io::Result<()> {
 
         App::new().app_data(cache_pool).service((
             get_biome_tile,
+            get_biome_tile_shaded,
+            get_contour_tile,
             actix_files::Files::new("/", concat!(env!("OUT_DIR"), "/pages"))
                 .index_file("index.html"),
         ))
@@ -59,10 +61,51 @@ async fn get_biome_tile(
     cache_pool: Data<CachePool<'_>>,
 ) -> impl Responder {
     let (zoom, x, y) = path.into_inner();
-    let Some(tile) = cache_pool.get_tile(zoom, x, y) else {
+    let Some(tile) = cache_pool.get_tile(zoom, x, y, false) else {
         return HttpResponse::NotFound()
             .content_type(ContentType::png())
             .body(include_bytes!("notile.png").as_slice());
+    };
+
+    let mut buf = Vec::new();
+
+    tile.write_with_encoder(PngEncoder::new(&mut buf)).unwrap();
+
+    HttpResponse::Ok()
+        .content_type(ContentType::png())
+        .body(buf)
+}
+
+#[get("/biomemap_shaded/{zoom}/{x}/{y}.png")]
+async fn get_biome_tile_shaded(
+    path: web::Path<(i32, i32, i32)>,
+    cache_pool: Data<CachePool<'_>>,
+) -> impl Responder {
+    let (zoom, x, y) = path.into_inner();
+    let Some(tile) = cache_pool.get_tile(zoom, x, y, true) else {
+        return HttpResponse::NotFound()
+            .content_type(ContentType::png())
+            .body(include_bytes!("notile.png").as_slice());
+    };
+
+    let mut buf = Vec::new();
+
+    tile.write_with_encoder(PngEncoder::new(&mut buf)).unwrap();
+
+    HttpResponse::Ok()
+        .content_type(ContentType::png())
+        .body(buf)
+}
+
+#[get("/contours/{zoom}/{x}/{y}.png")]
+async fn get_contour_tile(
+    path: web::Path<(i32, i32, i32)>,
+    cache_pool: Data<CachePool<'_>>,
+) -> impl Responder {
+    let (zoom, x, y) = path.into_inner();
+
+    let Some(tile) = ContourLines(&cache_pool).get_tile(zoom, x, y) else {
+        return HttpResponse::NotFound().finish();
     };
 
     let mut buf = Vec::new();

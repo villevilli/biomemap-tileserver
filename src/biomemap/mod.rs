@@ -8,6 +8,7 @@ use std::{
 };
 
 use cubiomes::generator::{Cache, Generator, Range, Scale};
+use image::GrayAlphaImage;
 use postprocess::{
     concat_lower_zoom, draw_contours, draw_shading, generate_heightmap, get_image,
     upsacale_blockscale,
@@ -125,8 +126,14 @@ impl<'lock, 'pool> Drop for CacheLock<'lock, 'pool> {
     }
 }
 
-impl TileProvider for CachePool<'_> {
-    fn get_tile(&self, zoom: i32, x: i32, y: i32) -> Option<image::DynamicImage> {
+impl CachePool<'_> {
+    pub fn get_tile(
+        &self,
+        zoom: i32,
+        x: i32,
+        y: i32,
+        is_shaded: bool,
+    ) -> Option<image::DynamicImage> {
         let mut tile = match zoom {
             -8 => get_image(x, y, self, Scale::HalfRegion),
             -7 => concat_lower_zoom(x, y, self, Scale::QuadChunk),
@@ -141,11 +148,27 @@ impl TileProvider for CachePool<'_> {
             _ => return None,
         };
 
-        let heightmap = generate_heightmap(x, y, zoom, self);
+        if is_shaded {
+            let heightmap = generate_heightmap(x * 256, y * 256, zoom, self);
 
-        draw_shading(&heightmap, &mut tile, 24);
+            draw_shading(&heightmap, &mut tile, 24);
+        }
+
+        Some(tile.into())
+    }
+}
+
+pub struct ContourLines<'a, 'b>(pub &'a CachePool<'b>)
+where
+    'b: 'a;
+
+impl TileProvider for ContourLines<'_, '_> {
+    fn get_tile(&self, zoom: i32, x: i32, y: i32) -> Option<image::DynamicImage> {
+        let heightmap = generate_heightmap(x * 256, y * 256, zoom, self.0);
 
         let frequency = 15;
+
+        let mut tile = GrayAlphaImage::from_pixel(256, 256, [0, 0].into());
 
         draw_contours(
             &heightmap,
