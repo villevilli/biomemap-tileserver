@@ -32,7 +32,6 @@ let shaded_base_layer = leaflet.tileLayer('http://localhost:3000/biomemap_shaded
     minZoom: -10,
 });
 
-
 let contour_layer = leaflet.tileLayer('http://localhost:3000/contours/{z}/{x}/{y}.png', {
     minNativeZoom: -8,
     maxZoom: 17,

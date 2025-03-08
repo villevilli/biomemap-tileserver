@@ -166,16 +166,43 @@ impl TileProvider for ContourLines<'_, '_> {
     fn get_tile(&self, zoom: i32, x: i32, y: i32) -> Option<image::DynamicImage> {
         let heightmap = generate_heightmap(x * 256, y * 256, zoom, self.0);
 
-        let frequency = 15;
+        let offset: u8 = 62;
+        let frequency: u8 = zoom_calc(zoom, |_| 15, |_| (15 + 5 * (zoom.abs())) as u8);
 
         let mut tile = GrayAlphaImage::from_pixel(256, 256, [0, 0].into());
 
         draw_contours(
             &heightmap,
-            (0..=(u8::MAX)).step_by(15).map(|x| x + (frequency % 15)),
+            (0..=(u8::MAX))
+                .step_by(frequency as usize)
+                .map(|x| x + (offset % frequency)),
             &mut tile,
+            30,
+        );
+
+        draw_contours(
+            &heightmap,
+            (0..=(u8::MAX))
+                .step_by(frequency as usize)
+                .map(|x| x + (offset % frequency * 3)),
+            &mut tile,
+            100,
         );
 
         Some(tile.into())
+    }
+}
+
+pub fn zoom_calc<F1, F2, T>(zoom: i32, zoomed_in: F1, zoomed_out: F2) -> T
+where
+    F1: Fn(u32) -> T,
+    F2: Fn(u32) -> T,
+{
+    let scale = 2_u32.pow(zoom.unsigned_abs());
+
+    if zoom.is_positive() {
+        zoomed_in(scale)
+    } else {
+        zoomed_out(scale)
     }
 }

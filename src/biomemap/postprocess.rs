@@ -93,6 +93,7 @@ pub fn draw_contours<Levels, Pixel, Container>(
     heightmap: &GrayImage,
     levels: Levels,
     tile: &mut ImageBuffer<Pixel, Container>,
+    alpha: u8,
 ) where
     Levels: Iterator<Item = u8>,
     Pixel: image::Pixel,
@@ -111,7 +112,7 @@ pub fn draw_contours<Levels, Pixel, Container>(
             let left_pixel = map[calc_2d_index(x as usize, w, y as usize + 1)];
 
             if this_pixel != above_pixel || this_pixel != left_pixel {
-                pixel.apply_with_alpha(|_| 0.into(), |_| 255.into());
+                pixel.apply_with_alpha(|_| 0.into(), |_| alpha.into());
             }
         });
     }
