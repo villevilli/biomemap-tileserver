@@ -14,7 +14,7 @@ use postprocess::{
     upsacale_blockscale,
 };
 
-use crate::tileprovider::TileProvider;
+use crate::tileprovider::{TilePos, TileProvider};
 
 pub struct CachePool<'pool> {
     generator: &'pool Generator,
@@ -158,12 +158,54 @@ impl CachePool<'_> {
     }
 }
 
+pub struct ShadedBiomeTile<'a>(CachePool<'a>);
+
+impl<'a> ShadedBiomeTile<'a> {
+    pub fn new(inner: CachePool<'a>) -> ShadedBiomeTile<'a> {
+        Self(inner)
+    }
+}
+
+impl TileProvider for ShadedBiomeTile<'_> {
+    fn get_tile(&self, pos: TilePos) -> Option<image::DynamicImage> {
+        self.0.get_tile(pos.zoom, pos.x, pos.y, true)
+    }
+}
+
+/*
+impl<'a> From<CachePool<'a>> for ShadedBiomeTile<'a> {
+    fn from(value: CachePool<'a>) -> Self {
+        Self(value)
+    }
+}
+*/
+
+pub struct UnshadedBiomeTile<'a, 'b>(&'a CachePool<'b>)
+where
+    'b: 'a;
+
+impl TileProvider for UnshadedBiomeTile<'_, '_> {
+    fn get_tile(&self, pos: TilePos) -> Option<image::DynamicImage> {
+        self.0.get_tile(pos.zoom, pos.x, pos.y, false)
+    }
+}
+
+impl<'b, 'a> From<&'a CachePool<'b>> for UnshadedBiomeTile<'a, 'b>
+where
+    'b: 'a,
+{
+    fn from(value: &'a CachePool<'b>) -> Self {
+        Self(value)
+    }
+}
 pub struct ContourLines<'a, 'b>(pub &'a CachePool<'b>)
 where
     'b: 'a;
 
 impl TileProvider for ContourLines<'_, '_> {
-    fn get_tile(&self, zoom: i32, x: i32, y: i32) -> Option<image::DynamicImage> {
+    fn get_tile(&self, pos: TilePos) -> Option<image::DynamicImage> {
+        let TilePos { x, y, zoom } = pos;
+
         let heightmap = generate_heightmap(x * 256, y * 256, zoom, self.0);
 
         let start_level: u8 = 62;
@@ -188,6 +230,15 @@ impl TileProvider for ContourLines<'_, '_> {
         );
 
         Some(tile.into())
+    }
+}
+
+impl<'b, 'a> From<&'a CachePool<'b>> for ContourLines<'a, 'b>
+where
+    'b: 'a,
+{
+    fn from(value: &'a CachePool<'b>) -> Self {
+        Self(value)
     }
 }
 
