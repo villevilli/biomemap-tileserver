@@ -16,6 +16,7 @@ use cubiomes::{
 use image::codecs::png::PngEncoder;
 
 const SEED: i64 = 3846517875239123423;
+const NOTILEPNG: &[u8] = include_bytes!("notile.png").as_slice();
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -74,7 +75,7 @@ async fn get_biome_tile(
     let Some(tile) = cache_pool.get_cached_tile(TilePos { zoom, x, y }) else {
         return HttpResponse::NotFound()
             .content_type(ContentType::png())
-            .body(include_bytes!("notile.png").as_slice());
+            .body(NOTILEPNG);
     };
 
     HttpResponse::Ok()
@@ -91,7 +92,7 @@ async fn get_biome_tile_shaded(
     let Some(tile) = cache_pool.get_tile(zoom, x, y, false) else {
         return HttpResponse::NotFound()
             .content_type(ContentType::png())
-            .body(include_bytes!("notile.png").as_slice());
+            .body(NOTILEPNG);
     };
 
     let mut buf = Vec::new();

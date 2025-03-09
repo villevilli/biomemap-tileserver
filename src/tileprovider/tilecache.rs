@@ -1,5 +1,6 @@
 use std::{collections::HashMap, io::Cursor, sync::Mutex};
 
+use actix_web::web::Bytes;
 use image::ImageFormat;
 use log::debug;
 
@@ -11,7 +12,7 @@ where
 {
     source: Source,
     format: ImageFormat,
-    memcache: Mutex<HashMap<TilePos, &'static [u8]>>,
+    memcache: Mutex<HashMap<TilePos, Bytes>>,
 }
 
 impl<S> TileCache<S>
@@ -26,22 +27,21 @@ where
         }
     }
 
-    pub fn get_cached_tile(&self, pos: TilePos) -> Option<&'static [u8]> {
+    pub fn get_cached_tile(&self, pos: TilePos) -> Option<Bytes> {
         {
             let memcache = self.memcache.lock().unwrap();
 
             if let Some(tile) = memcache.get(&pos) {
                 debug!("Cache Hit");
-                return Some(tile);
+                return Some(tile.clone());
             }
         }
 
-        let buf = self.generate_tile(pos)?;
+        let val: Bytes = self.generate_tile(pos)?.into();
 
         {
             let mut memcache = self.memcache.lock().unwrap();
-            let val = buf.leak();
-            memcache.insert(pos, val);
+            memcache.insert(pos, val.clone());
             debug!("Cache Miss");
             Some(val)
         }
