@@ -5,16 +5,13 @@ use actix_web::{
     http::header::ContentType,
     web::{self, Data},
 };
-use biomemap::{CachePool, ContourLines};
+use biomemap_tileserver::biomemap::{CachePool, ContourLines};
+use biomemap_tileserver::tileprovider::TileProvider;
 use cubiomes::{
     enums::MCVersion,
     generator::{Generator, GeneratorFlags},
 };
 use image::codecs::png::PngEncoder;
-use tileprovider::TileProvider;
-
-mod biomemap;
-mod tileprovider;
 
 const SEED: i64 = 3846517875239123423;
 

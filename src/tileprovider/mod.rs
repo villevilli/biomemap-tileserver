@@ -5,6 +5,7 @@ pub trait TileProvider {
     fn get_tile(&self, zoom: i32, x: i32, y: i32) -> Option<DynamicImage>;
 }
 
+#[derive(Default)]
 pub struct Blacktile;
 
 impl TileProvider for Blacktile {
@@ -13,7 +14,6 @@ impl TileProvider for Blacktile {
     }
 }
 
-#[allow(dead_code)]
 impl Blacktile {
     pub const fn new() -> Self {
         Self
