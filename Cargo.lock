@@ -424,6 +424,7 @@ dependencies = [
  "cubiomes",
  "env_logger",
  "image",
+ "log",
  "tokio",
  "tokio-stream",
 ]

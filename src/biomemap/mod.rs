@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     error::Error,
     ops::{Deref, DerefMut},
-    sync::{Arc, Mutex},
+    sync::Mutex,
 };
 
 use cubiomes::generator::{Cache, Generator, Range, Scale};
@@ -158,10 +158,10 @@ impl CachePool<'_> {
     }
 }
 
-pub struct ShadedBiomeTile<'a>(Arc<CachePool<'a>>);
+pub struct ShadedBiomeTile<'a>(CachePool<'a>);
 
 impl<'a> ShadedBiomeTile<'a> {
-    pub fn new(inner: Arc<CachePool<'a>>) -> ShadedBiomeTile<'a> {
+    pub fn new(inner: CachePool<'a>) -> ShadedBiomeTile<'a> {
         Self(inner)
     }
 }

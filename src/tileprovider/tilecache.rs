@@ -1,6 +1,7 @@
-use std::{collections::HashMap, io::Cursor};
+use std::{collections::HashMap, io::Cursor, sync::Mutex};
 
 use image::ImageFormat;
+use log::debug;
 
 use super::{TilePos, TileProvider};
 
@@ -10,7 +11,7 @@ where
 {
     source: Source,
     format: ImageFormat,
-    memcache: HashMap<TilePos, Vec<u8>>,
+    memcache: Mutex<HashMap<TilePos, &'static [u8]>>,
 }
 
 impl<S> TileCache<S>
@@ -21,24 +22,32 @@ where
         Self {
             source,
             format,
-            memcache: HashMap::new(),
+            memcache: Mutex::new(HashMap::new()),
         }
     }
 
-    pub fn get_cached_tile(&mut self, pos: TilePos) -> Option<Vec<u8>> {
-        // I couldn't get the lifetimes to co-operate without this. Yes it does
-        // hash twice ):
-        #[allow(clippy::map_entry)]
-        if self.memcache.contains_key(&pos) {
-            Some(self.memcache.get(&pos).unwrap().clone())
-        } else {
-            self.memcache.insert(pos, self.get_tile(pos)?);
+    pub fn get_cached_tile(&self, pos: TilePos) -> Option<&'static [u8]> {
+        {
+            let memcache = self.memcache.lock().unwrap();
 
-            self.get_cached_tile(pos)
+            if let Some(tile) = memcache.get(&pos) {
+                debug!("Cache Hit");
+                return Some(tile);
+            }
+        }
+
+        let buf = self.generate_tile(pos)?;
+
+        {
+            let mut memcache = self.memcache.lock().unwrap();
+            let val = buf.leak();
+            memcache.insert(pos, val);
+            debug!("Cache Miss");
+            Some(val)
         }
     }
 
-    fn get_tile(&self, pos: TilePos) -> Option<Vec<u8>> {
+    fn generate_tile(&self, pos: TilePos) -> Option<Vec<u8>> {
         let mut buf = Cursor::new(Vec::new());
         self.source
             .get_tile(pos)?
