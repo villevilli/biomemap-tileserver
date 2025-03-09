@@ -50,7 +50,7 @@ let overlays = {
 
 let map = leaflet.map('map', {
     crs: leaflet.CRS.Simple,
-    layers: [base_layer, contour_layer]
+    layers: [base_layer]
 }).setView([0.0, 0.0], 0);
 
 let layer_control = leaflet.control.layers(base_maps, overlays).addTo(map);

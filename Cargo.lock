@@ -425,6 +425,7 @@ dependencies = [
  "env_logger",
  "image",
  "log",
+ "parking_lot",
  "tokio",
  "tokio-stream",
 ]

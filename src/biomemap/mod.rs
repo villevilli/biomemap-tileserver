@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     error::Error,
     ops::{Deref, DerefMut},
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 use cubiomes::generator::{Cache, Generator, Range, Scale};
@@ -18,14 +18,23 @@ use crate::tileprovider::{TilePos, TileProvider};
 
 pub struct CachePool<'pool> {
     generator: &'pool Generator,
-    caches: Mutex<BTreeMap<Scale, Vec<Cache<'pool>>>>,
+    caches: Arc<Mutex<BTreeMap<Scale, Vec<Cache<'pool>>>>>,
+}
+
+impl Clone for CachePool<'_> {
+    fn clone(&self) -> Self {
+        Self {
+            generator: self.generator,
+            caches: self.caches.clone(),
+        }
+    }
 }
 
 impl<'pool> CachePool<'pool> {
     pub fn new(generator: &'pool Generator) -> Self {
         Self {
             generator,
-            caches: Mutex::new(BTreeMap::new()),
+            caches: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -172,41 +181,32 @@ impl TileProvider for ShadedBiomeTile<'_> {
     }
 }
 
-/*
 impl<'a> From<CachePool<'a>> for ShadedBiomeTile<'a> {
     fn from(value: CachePool<'a>) -> Self {
         Self(value)
     }
 }
-*/
 
-pub struct UnshadedBiomeTile<'a, 'b>(&'a CachePool<'b>)
-where
-    'b: 'a;
+pub struct UnshadedBiomeTile<'a>(CachePool<'a>);
 
-impl TileProvider for UnshadedBiomeTile<'_, '_> {
+impl TileProvider for UnshadedBiomeTile<'_> {
     fn get_tile(&self, pos: TilePos) -> Option<image::DynamicImage> {
         self.0.get_tile(pos.zoom, pos.x, pos.y, false)
     }
 }
 
-impl<'b, 'a> From<&'a CachePool<'b>> for UnshadedBiomeTile<'a, 'b>
-where
-    'b: 'a,
-{
-    fn from(value: &'a CachePool<'b>) -> Self {
+impl<'a> From<CachePool<'a>> for UnshadedBiomeTile<'a> {
+    fn from(value: CachePool<'a>) -> Self {
         Self(value)
     }
 }
-pub struct ContourLines<'a, 'b>(pub &'a CachePool<'b>)
-where
-    'b: 'a;
+pub struct ContourLines<'a>(pub CachePool<'a>);
 
-impl TileProvider for ContourLines<'_, '_> {
+impl TileProvider for ContourLines<'_> {
     fn get_tile(&self, pos: TilePos) -> Option<image::DynamicImage> {
         let TilePos { x, y, zoom } = pos;
 
-        let heightmap = generate_heightmap(x * 256, y * 256, zoom, self.0);
+        let heightmap = generate_heightmap(x * 256, y * 256, zoom, &self.0);
 
         let start_level: u8 = 62;
         let frequency = zoom_calc(zoom, |_| 30, |scale| ((15 * (scale)) as u8));
@@ -233,11 +233,8 @@ impl TileProvider for ContourLines<'_, '_> {
     }
 }
 
-impl<'b, 'a> From<&'a CachePool<'b>> for ContourLines<'a, 'b>
-where
-    'b: 'a,
-{
-    fn from(value: &'a CachePool<'b>) -> Self {
+impl<'a> From<CachePool<'a>> for ContourLines<'a> {
+    fn from(value: CachePool<'a>) -> Self {
         Self(value)
     }
 }
