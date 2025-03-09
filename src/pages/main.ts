@@ -1,5 +1,6 @@
 import * as leaflet from "https://unpkg.com/leaflet/dist/leaflet-src.esm.js";
 
+const origin = window.location.origin
 
 class MousePositionControl extends leaflet.Control {
     element: HTMLElement;
@@ -20,19 +21,19 @@ class MousePositionControl extends leaflet.Control {
 }
 
 
-let base_layer = leaflet.tileLayer('http://localhost:3000/biomemap/{z}/{x}/{y}.png', {
+let base_layer = leaflet.tileLayer(`${origin}/biomemap/{z}/{x}/{y}.png`, {
     minNativeZoom: -8,
     maxZoom: 17,
     minZoom: -10,
 });
 
-let shaded_base_layer = leaflet.tileLayer('http://localhost:3000/biomemap_shaded/{z}/{x}/{y}.png', {
+let shaded_base_layer = leaflet.tileLayer(`${origin}/biomemap_shaded/{z}/{x}/{y}.png`, {
     minNativeZoom: -8,
     maxZoom: 17,
     minZoom: -10,
 });
 
-let contour_layer = leaflet.tileLayer('http://localhost:3000/contours/{z}/{x}/{y}.png', {
+let contour_layer = leaflet.tileLayer(`${origin}/contours/{z}/{x}/{y}.png`, {
     minNativeZoom: -8,
     maxZoom: 17,
     minZoom: -10,
@@ -49,7 +50,7 @@ let overlays = {
 
 let map = leaflet.map('map', {
     crs: leaflet.CRS.Simple,
-    layers: [base_layer, shaded_base_layer, contour_layer]
+    layers: [base_layer, contour_layer]
 }).setView([0.0, 0.0], 0);
 
 let layer_control = leaflet.control.layers(base_maps, overlays).addTo(map);
