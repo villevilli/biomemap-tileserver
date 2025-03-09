@@ -5,8 +5,11 @@ use actix_web::{
     http::header::ContentType,
     web::{self, Data},
 };
-use biomemap_tileserver::biomemap::{CachePool, ContourLines};
 use biomemap_tileserver::tileprovider::TileProvider;
+use biomemap_tileserver::{
+    biomemap::{CachePool, ContourLines},
+    tileprovider::TilePos,
+};
 use cubiomes::{
     enums::MCVersion,
     generator::{Generator, GeneratorFlags},
@@ -17,9 +20,14 @@ const SEED: i64 = 3846517875239123423;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    unsafe {
+        std::env::set_var("RUST_LOG", "debug");
+    }
+    env_logger::init();
+
     let address = SocketAddrV4::new("0.0.0.0".parse().unwrap(), 3000);
 
-    let server = HttpServer::new(|| {
+    HttpServer::new(|| {
         let g = Box::leak(Box::new(Generator::new(
             MCVersion::MC_1_21_WD,
             SEED,
@@ -38,11 +46,10 @@ async fn main() -> std::io::Result<()> {
         ))
     })
     .bind(address)?
-    .run();
+    .run()
+    .await?;
 
-    println!("server running at http://{}", address);
-
-    server.await
+    Ok(())
 }
 
 #[get("/")]
@@ -101,7 +108,7 @@ async fn get_contour_tile(
 ) -> impl Responder {
     let (zoom, x, y) = path.into_inner();
 
-    let Some(tile) = ContourLines(&cache_pool).get_tile(zoom, x, y) else {
+    let Some(tile) = ContourLines(&cache_pool).get_tile(TilePos::new(zoom, x, y)) else {
         return HttpResponse::NotFound().finish();
     };
 
