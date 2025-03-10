@@ -1,11 +1,84 @@
-use std::{collections::HashMap, io::Cursor, time::Instant};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    fs::create_dir_all,
+    io::{Cursor, ErrorKind},
+    path::PathBuf,
+};
 
-use actix_web::web::Bytes;
+use actix_web::{ResponseError, http::StatusCode, web::Bytes};
 use image::ImageFormat;
-use log::debug;
+use log::error;
 use parking_lot::RwLock;
+use tokio::{
+    fs::{read, write},
+    io,
+};
 
 use super::{TilePos, TileProvider};
+
+#[derive(Debug)]
+pub enum Error {
+    NoTileInProvider,
+    WriteError(io::Error),
+    ReadError(io::Error),
+    CreateDirError(io::Error),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::NoTileInProvider => {
+                writeln!(
+                    f,
+                    "the source could not provide a tile for the requested position"
+                )
+            }
+            Error::WriteError(_) => writeln!(
+                f,
+                "Error occured while trying to write to the underyling fs"
+            ),
+            Error::ReadError(_) => writeln!(
+                f,
+                "Error occured while trying to read from the underyling fs"
+            ),
+            Error::CreateDirError(_) => {
+                writeln!(f, "failed to create the directory to use with the cache")
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::NoTileInProvider => None,
+            Error::WriteError(e) => Some(e),
+            Error::ReadError(e) => Some(e),
+            Error::CreateDirError(e) => Some(e),
+        }
+    }
+}
+
+impl ResponseError for Error {
+    fn status_code(&self) -> actix_web::http::StatusCode {
+        match self {
+            Error::NoTileInProvider => StatusCode::NOT_FOUND,
+            Error::WriteError(e) => {
+                error!("{}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+            Error::ReadError(e) => {
+                error!("{}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+            Error::CreateDirError(e) => {
+                error!("{}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        }
+    }
+}
 
 pub struct TileCache<Source>
 where
@@ -13,6 +86,7 @@ where
 {
     source: Source,
     format: ImageFormat,
+    base_path: PathBuf,
     memcache: RwLock<HashMap<TilePos, Bytes>>,
 }
 
@@ -20,38 +94,36 @@ impl<S> TileCache<S>
 where
     S: TileProvider,
 {
-    pub fn new(source: S, format: ImageFormat) -> Self {
-        Self {
+    pub fn new<T>(source: S, format: ImageFormat, base_path: T) -> Result<Self, Error>
+    where
+        T: Into<PathBuf>,
+    {
+        let base_path = base_path.into();
+        create_dir_all(&base_path).map_err(Error::CreateDirError)?;
+
+        Ok(Self {
             source,
             format,
+            base_path,
             memcache: RwLock::new(HashMap::new()),
-        }
+        })
     }
 
-    pub fn get_cached_tile(&self, pos: TilePos) -> Option<Bytes> {
+    pub async fn get_cached_tile(&self, pos: TilePos) -> Result<Bytes, Error> {
         {
-            let before_mutex = Instant::now();
             let memcache = self.memcache.read();
-            debug!("Time to lock mutex (reading): {:?}", before_mutex.elapsed());
 
             if let Some(tile) = memcache.get(&pos) {
-                return Some(tile.clone());
+                return Ok(tile.clone());
             }
-
-            debug!("Time to read tile: {:?}", before_mutex.elapsed());
         }
-        let before_write = Instant::now();
 
-        let val: Bytes = self.generate_tile(pos)?.into();
-
-        debug!("Time to generate tile: {:?}", before_write.elapsed());
+        let val: Bytes = self.read_or_gen_tile_fs(pos).await?.into();
 
         {
-            let before_mutex = Instant::now();
             let mut memcache = self.memcache.write();
             memcache.insert(pos, val.clone());
-            debug!("Time to write tile to cache: {:?}", before_mutex.elapsed());
-            Some(val)
+            Ok(val)
         }
     }
 
@@ -59,12 +131,37 @@ where
         &self.format
     }
 
-    fn generate_tile(&self, pos: TilePos) -> Option<Vec<u8>> {
+    fn generate_tile(&self, pos: TilePos) -> Result<Vec<u8>, Error> {
         let mut buf = Cursor::new(Vec::new());
         self.source
-            .get_tile(pos)?
+            .get_tile(pos)
+            .ok_or(Error::NoTileInProvider)?
             .write_to(&mut buf, self.format)
             .unwrap_or_else(|_| panic!("Writing tile {pos:?} failed"));
-        Some(buf.into_inner())
+        Ok(buf.into_inner())
+    }
+
+    async fn read_or_gen_tile_fs(&self, pos: TilePos) -> Result<Vec<u8>, Error> {
+        let dir = self.base_path.join(format!("{}/{}/", pos.zoom, pos.x));
+
+        // We ignore this error, since the directory might already exist
+        let _ = create_dir_all(&dir);
+
+        let path = format!("{}{}.{}", dir.to_str().unwrap(), pos.y, {
+            self.format.extensions_str()[0]
+        });
+
+        match read(&path).await {
+            Ok(buf) => Ok(buf),
+            Err(e) => {
+                if e.kind() == ErrorKind::NotFound {
+                    let img = self.generate_tile(pos)?;
+                    write(path, &img).await.map_err(Error::WriteError)?;
+                    Ok(img)
+                } else {
+                    Err(Error::ReadError(e))
+                }
+            }
+        }
     }
 }
