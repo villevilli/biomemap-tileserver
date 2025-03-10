@@ -7,4 +7,9 @@ node_modules/
 # Cargo Flamgraph
 perf*
 flamegraph.svg
+
+# Tilemap
 tiles/
+
+# Macos
+.DS_Store
