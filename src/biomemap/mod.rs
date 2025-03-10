@@ -5,10 +5,12 @@ use std::{
     error::Error,
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
+    time::Instant,
 };
 
 use cubiomes::generator::{Cache, Generator, Range, Scale};
 use image::GrayAlphaImage;
+use log::debug;
 use postprocess::{
     concat_lower_zoom, draw_contours, draw_shading, generate_heightmap, get_image,
     upsacale_blockscale,
@@ -52,11 +54,15 @@ impl<'pool> CachePool<'pool> {
     where
         'pool: 'lock,
     {
-        let mut caches = self.caches.lock().unwrap();
+        let cache: Option<Cache<'pool>> = {
+            let pre_lock = Instant::now();
+            let mut caches = self.caches.lock().unwrap();
 
-        caches.entry(scale).or_default();
+            caches.entry(scale).or_default();
+            debug!("{:?}", pre_lock.elapsed());
 
-        let cache: Option<Cache<'pool>> = caches.get_mut(&scale).unwrap().pop();
+            caches.get_mut(&scale).unwrap().pop()
+        };
 
         if let Some(mut cache) = cache {
             cache.move_cache(x, y, z)?;
