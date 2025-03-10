@@ -24,9 +24,12 @@ const SEED: i64 = 3846517875239123423;
 // Note change urls if you change this
 const TILE_IMAGE_FORMAT: ImageFormat = image::ImageFormat::Png;
 
+const CACHED_TILE_AMOUNT: usize = 50000;
+
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // SAFETY: probs??? i dont think anything elsee is touching the env vars yet ... lol
+    // SAFETY: probs??? i dont think anything elsee is touching the env vars yet ...
+    // lol
     unsafe {
         std::env::set_var("RUST_LOG", "debug");
     }
@@ -44,18 +47,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let shade_tile_cache = web::Data::new(TileCache::new(
         ShadedBiomeTile::from(cache_pool.clone()),
+        CACHED_TILE_AMOUNT,
         TILE_IMAGE_FORMAT,
         "./tiles/shaded/",
     )?);
 
     let unsahded_tile_cahce = web::Data::new(TileCache::new(
         UnshadedBiomeTile::from(cache_pool.clone()),
+        CACHED_TILE_AMOUNT,
         TILE_IMAGE_FORMAT,
         "./tiles/unshaded/",
     )?);
 
     let contour_line_cache = web::Data::new(TileCache::new(
         ContourLines::from(cache_pool),
+        CACHED_TILE_AMOUNT,
         TILE_IMAGE_FORMAT,
         "./tiles/contour/",
     )?);
