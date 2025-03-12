@@ -35,6 +35,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           ${{ runner.os }}-cargo-    
+    - name: Install Dependencies
+      run: npm install
     - name: Build
       run: cargo build --verbose
     - name: Lint
