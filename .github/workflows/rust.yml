@@ -11,10 +11,6 @@ env:
   RUSTFLAGS: "-Dwarnings"
   RUSTDOCFLAGS: "-Dwarnings"
 
-concurrency:
-  group: check
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
