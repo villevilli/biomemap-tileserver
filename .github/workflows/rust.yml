@@ -1,0 +1,47 @@
+name: Rust
+
+on:
+  push:
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Make sure CI fails on all warnings
+  RUSTFLAGS: "-Dwarnings"
+  RUSTDOCFLAGS: "-Dwarnings"
+
+concurrency:
+  group: check
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup rust nightly toolchain
+      run: rustup default nightly
+    - name: Cache rust build artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          ${{ runner.os }}-cargo-    
+    - name: Build
+      run: cargo build --verbose
+    - name: Lint
+      run: cargo clippy --verbose
+    - name: Fmt
+      run: cargo fmt --check
+    - name: Run tests
+      run: cargo test --verbose
+
+    
