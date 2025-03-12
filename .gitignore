@@ -11,5 +11,8 @@ flamegraph.svg
 # Tilemap
 tiles/
 
+# VSCode
+.vscode/
+
 # Macos
 .DS_Store
