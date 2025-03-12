@@ -181,7 +181,8 @@ fn higher_lower(map: &[u8], targe_height: u8, buf: &mut Vec<bool>) {
 
 /// Draws contour lines onto the given image at the zoom level.
 ///
-/// Heightmap must be big enough and should begin one left and end one right of the are in the image
+/// Heightmap must be big enough and should begin one left and end one right of
+/// the are in the image
 pub fn draw_shading(heightmap: &GrayImage, tile: &mut RgbImage, strenght: i8) {
     let tile_scale = 1;
     let (w, h) = tile.dimensions();
@@ -271,14 +272,16 @@ enum Direction {
     Lower(i8),
 }
 
-/// Gets heightmap change from this and left (eg is left higher flat or lower than self)
+/// Gets heightmap change from this and left (eg is left higher flat or lower
+/// than self)
 fn height_change_x(hmx: u32, hmy: u32, heightmap: &GrayImage) -> Direction {
     let cmp_point = heightmap.get_pixel(hmx + 1, hmy).0[0];
     let left_point = heightmap.get_pixel(hmx, hmy).0[0];
     dir(left_point, cmp_point)
 }
 
-/// Gets heightmap change from this and above (eg is abover higher flat or lower than self)
+/// Gets heightmap change from this and above (eg is abover higher flat or lower
+/// than self)
 fn height_change_y(hmx: u32, hmy: u32, heightmap: &GrayImage) -> Direction {
     let cmp_point = heightmap.get_pixel(hmx, hmy + 1).0[0];
     let up_point = heightmap.get_pixel(hmx, hmy).0[0];
