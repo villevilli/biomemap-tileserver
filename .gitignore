@@ -11,6 +11,10 @@ flamegraph.svg
 # Tilemap
 tiles/
 
+# Minecraft Resourcepack
+resourcepack/**/*
+!resourcepack/.gitkeep
+
 # VSCode
 .vscode/
 
