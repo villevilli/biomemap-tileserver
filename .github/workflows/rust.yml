@@ -24,6 +24,7 @@ jobs:
       run: |
         rustup default nightly
         rustup component add clippy
+        rustup component add rustfmt
     - name: Cache rust build artifacts
       uses: actions/cache@v4
       with:
