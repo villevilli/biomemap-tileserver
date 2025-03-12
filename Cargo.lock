@@ -413,6 +413,7 @@ dependencies = [
  "image",
  "log",
  "parking_lot",
+ "serde",
  "tokio",
 ]
 
