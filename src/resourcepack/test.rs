@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use super::{MinecraftResourceIdentifier, ParseError};
+use super::{BlockStateResource, MinecraftResourceIdentifier, ParseError, blockstate::BlockState};
 
 #[test]
 fn parse_resource_identifiers() -> Result<(), ParseError> {
@@ -26,4 +26,16 @@ fn parse_resource_identifiers() -> Result<(), ParseError> {
     );
 
     Ok(())
+}
+
+fn blockstate_equalit() {
+    let mut blockstate_1 = BlockState::new();
+    blockstate_1.insert("flying", "true");
+    blockstate_1.insert("lines", "3");
+
+    let mut blockstate_2 = BlockState::new();
+    blockstate_1.insert("lines", "3");
+    blockstate_1.insert("flying", "true");
+
+    assert_eq!(blockstate_1, blockstate_2);
 }

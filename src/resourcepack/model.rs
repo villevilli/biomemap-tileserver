@@ -44,7 +44,6 @@ impl Model {
         path: &Path,
         resource_identifier: MinecraftResourceIdentifier,
     ) -> Result<Option<Self>> {
-        dbg!(&resource_identifier);
         let data = read_to_string(resource_identifier.into_prefixed_path(path))?;
 
         Model::try_fill_from_parent(from_str(&data)?, path)
@@ -57,13 +56,7 @@ impl Model {
     }
 
     pub fn try_fill_from_parent(mut self, path: &Path) -> Result<Option<Self>> {
-        let self_clone = self.clone();
-        dbg!(self_clone);
-
         let Some(parent) = self.parent else {
-            eprintln!(
-                "RETURNED-------------------RETURNED-------------------RETURNED-------------------RETURNED"
-            );
             return Ok(Some(self));
         };
 
@@ -72,25 +65,6 @@ impl Model {
 
         let mut new_model: Model = from_str(&data)?;
 
-        if let Some(new_textures) = new_model.textures.as_mut() {
-            new_textures.values_mut().for_each(|new_texture| {
-                if new_texture.starts_with('#') {
-                    *new_texture = self
-                        .textures
-                        .as_mut()
-                        .unwrap()
-                        .get(new_texture.strip_prefix('#').unwrap())
-                        .cloned()
-                        .unwrap();
-                }
-            });
-        }
-
-        if let Some(mut elemnts) = self.elements {
-            let mut e = new_model.elements.unwrap_or_default();
-            e.append(&mut elemnts);
-            new_model.elements = Some(e);
-        }
         if let Some(textures) = self.textures {
             if let Some(x) = new_model.textures.as_mut() {
                 textures.into_iter().for_each(|(k, v)| {
@@ -99,6 +73,25 @@ impl Model {
             } else {
                 new_model.textures = Some(textures);
             }
+        }
+
+        if let Some(mut new_textures) = new_model.textures.as_mut() {
+            let refs: Vec<(String, String)> = new_textures
+                .iter()
+                .filter(|(k, v)| v.starts_with('#'))
+                .map(|(k, v)| (k.clone(), v.strip_prefix('#').unwrap().to_owned()))
+                .collect();
+
+            for (set_key, ref_key) in refs {
+                let set_value = new_textures.get(&ref_key).unwrap();
+                new_textures.insert(set_key, set_value.clone());
+            }
+        }
+
+        if let Some(mut elemnts) = self.elements {
+            let mut e = new_model.elements.unwrap_or_default();
+            e.append(&mut elemnts);
+            new_model.elements = Some(e);
         }
 
         new_model.try_fill_from_parent(path)
