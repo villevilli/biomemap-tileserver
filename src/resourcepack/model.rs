@@ -44,6 +44,7 @@ impl Model {
         path: &Path,
         resource_identifier: MinecraftResourceIdentifier,
     ) -> Result<Option<Self>> {
+        dbg!(&resource_identifier);
         let data = read_to_string(resource_identifier.into_prefixed_path(path))?;
 
         Model::try_fill_from_parent(from_str(&data)?, path)
@@ -57,9 +58,12 @@ impl Model {
 
     pub fn try_fill_from_parent(mut self, path: &Path) -> Result<Option<Self>> {
         let self_clone = self.clone();
+        dbg!(self_clone);
 
         let Some(parent) = self.parent else {
-            dbg!("RETURNED-------------------RETURNED");
+            eprintln!(
+                "RETURNED-------------------RETURNED-------------------RETURNED-------------------RETURNED"
+            );
             return Ok(Some(self));
         };
 
@@ -68,32 +72,25 @@ impl Model {
 
         let mut new_model: Model = from_str(&data)?;
 
-        dbg!(&new_model);
-
-        new_model.textures.as_mut().map(|x| {
-            x.values_mut().for_each(|x| {
-                if x.starts_with('#') {
-                    *x = self
+        if let Some(new_textures) = new_model.textures.as_mut() {
+            new_textures.values_mut().for_each(|new_texture| {
+                if new_texture.starts_with('#') {
+                    *new_texture = self
                         .textures
                         .as_mut()
                         .unwrap()
-                        .get(x.strip_prefix('#').unwrap())
+                        .get(new_texture.strip_prefix('#').unwrap())
                         .cloned()
                         .unwrap();
                 }
             });
-
-            x
-        });
-
-        if let Some(mut elemnts) = self.elements {
-            new_model
-                .elements
-                .as_mut()
-                .unwrap_or(&mut Vec::new())
-                .append(&mut elemnts);
         }
 
+        if let Some(mut elemnts) = self.elements {
+            let mut e = new_model.elements.unwrap_or_default();
+            e.append(&mut elemnts);
+            new_model.elements = Some(e);
+        }
         if let Some(textures) = self.textures {
             if let Some(x) = new_model.textures.as_mut() {
                 textures.into_iter().for_each(|(k, v)| {
