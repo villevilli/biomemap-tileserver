@@ -5,10 +5,11 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use image::RgbaImage;
 use serde::Deserialize;
 use serde_json::from_str;
 
-use super::{MinecraftResourceIdentifier, resource_identifier};
+use super::{Facing, MinecraftResourceIdentifier, resource_identifier};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct BlockTextures {
@@ -20,13 +21,24 @@ pub struct BlockTextures {
     east: Option<Face>,
 }
 
-impl Model {}
+impl BlockTextures {
+    pub fn get(&self, facing: Facing) -> Option<Face> {
+        match facing {
+            Facing::Up => self.up.clone(),
+            Facing::Down => self.down.clone(),
+            Facing::North => self.north.clone(),
+            Facing::South => self.south.clone(),
+            Facing::East => self.east.clone(),
+            Facing::West => self.west.clone(),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Model {
-    parent: Option<MinecraftResourceIdentifier>,
-    textures: Option<HashMap<String, String>>,
-    elements: Option<Vec<Element>>,
+    pub(crate) parent: Option<MinecraftResourceIdentifier>,
+    pub(crate) textures: Option<HashMap<String, String>>,
+    pub(crate) elements: Option<Vec<Element>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -47,6 +59,22 @@ impl Model {
         let data = read_to_string(resource_identifier.into_prefixed_path(path))?;
 
         Model::try_fill_from_parent(from_str(&data)?, path)
+    }
+
+    pub(crate) fn get_side(&self, facing: super::Facing) -> Option<MinecraftResourceIdentifier> {
+        for element in self.elements.as_ref()? {
+            if let Some(face) = element.faces.get(facing) {
+                if let Some(path) = self
+                    .textures
+                    .as_ref()
+                    .unwrap()
+                    .get(face.texture.strip_prefix('#').unwrap_or(&face.texture))
+                {
+                    return Some(path.parse().unwrap());
+                }
+            }
+        }
+        None
     }
 
     pub fn from_namespace(name: MinecraftResourceIdentifier, path: &Path) -> Result<Self> {

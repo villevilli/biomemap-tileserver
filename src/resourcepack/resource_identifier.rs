@@ -134,6 +134,14 @@ impl MinecraftResourceIdentifier {
 
         path
     }
+
+    pub fn into_texture_path(self) -> PathBuf {
+        let mut path = PathBuf::from("assets");
+        path.push(self.namespace.0);
+        path.push("textures");
+        path.push(self.path.0);
+        path.with_extension("png")
+    }
 }
 
 fn is_valid_path(path: String) -> Result<String, ParseError> {

@@ -5,13 +5,14 @@ pub use resource_identifier::{MinecraftResourceIdentifier, ParseError};
 
 use std::{
     collections::HashMap,
+    fmt::Display,
     fs::{read_dir, read_to_string},
     io,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
-use image::DynamicImage;
+use image::{DynamicImage, RgbaImage};
 use log::warn;
 use resource_identifier::ResourceNamespace;
 use serde::Deserialize;
@@ -30,6 +31,33 @@ pub enum Error {
     ResourceIdentifierError(#[from] resource_identifier::ParseError),
     #[error("Encountered an error in filesystem io")]
     IOError(#[from] io::Error),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum Facing {
+    Up,
+    Down,
+    North,
+    South,
+    East,
+    West,
+}
+
+impl Display for Facing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Facing::Up => "up",
+                Facing::Down => "down",
+                Facing::North => "north",
+                Facing::South => "south",
+                Facing::East => "east",
+                Facing::West => "west",
+            }
+        )
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,7 +80,8 @@ struct Variant {
 
 pub fn get_block_texture_map(
     resource_pack_path: &Path,
-) -> Result<HashMap<(MinecraftResourceIdentifier, BlockState), DynamicImage>> {
+    facing: Facing,
+) -> Result<HashMap<(MinecraftResourceIdentifier, BlockState), PathBuf>> {
     let asset_path = resource_pack_path.join("assets");
     let potential_namespaces = read_dir(&asset_path);
 
@@ -67,7 +96,7 @@ pub fn get_block_texture_map(
         read_blockstates(&asset_path.join(namespace.to_string()), &mut blockstates)?;
     }
 
-    let mut thingies_2: HashMap<(BlockState, MinecraftResourceIdentifier), Model> = HashMap::new();
+    let mut thingies_2: HashMap<(MinecraftResourceIdentifier, BlockState), Model> = HashMap::new();
 
     for (resource_identifier, block_state) in blockstates.into_iter() {
         let Some(mut variant) = block_state.variants else {
@@ -91,14 +120,15 @@ pub fn get_block_texture_map(
             };
 
             if let Some(block_texture) = block_texture {
-                thingies_2.insert((bs, resource_identifier.clone()), block_texture);
+                thingies_2.insert((resource_identifier.clone(), bs), block_texture);
             }
         }
     }
 
-    dbg!(&thingies_2);
-
-    todo!()
+    Ok(thingies_2
+        .into_iter()
+        .filter_map(|(k, v)| Some((k, v.get_side(facing)?.into_texture_path())))
+        .collect())
 }
 
 fn read_blockstates(

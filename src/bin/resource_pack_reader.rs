@@ -11,7 +11,7 @@ fn main() -> Result<()> {
 
     let path = PathBuf::from_str("./resourcepack/VanillaDefault 1.21.3")?;
 
-    let resource_pack_map = resourcepack::get_block_texture_map(&path)?;
+    let resource_pack_map = resourcepack::get_block_texture_map(&path, resourcepack::Facing::Up)?;
 
     dbg!(resource_pack_map);
 
