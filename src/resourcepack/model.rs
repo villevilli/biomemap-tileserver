@@ -10,47 +10,45 @@ use serde_json::from_str;
 
 use super::{MinecraftResourceIdentifier, resource_identifier};
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct BlockTextures {
-    down: MinecraftResourceIdentifier,
-    up: MinecraftResourceIdentifier,
-    north: MinecraftResourceIdentifier,
-    south: MinecraftResourceIdentifier,
-    west: MinecraftResourceIdentifier,
-    east: MinecraftResourceIdentifier,
+    down: Option<Face>,
+    up: Option<Face>,
+    north: Option<Face>,
+    south: Option<Face>,
+    west: Option<Face>,
+    east: Option<Face>,
 }
 
-impl BlockTextures {
+impl Model {}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Model {
+    parent: Option<MinecraftResourceIdentifier>,
+    textures: Option<HashMap<String, String>>,
+    elements: Option<Vec<Element>>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Element {
+    faces: BlockTextures,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Face {
+    texture: String,
+}
+
+impl Model {
     pub fn from_file(
         path: &Path,
         resource_identifier: MinecraftResourceIdentifier,
     ) -> Result<Option<Self>> {
         let data = read_to_string(resource_identifier.into_prefixed_path(path))?;
 
-        let Some(mut raw_model) = RawModel::try_fill_from_parent(from_str(&data)?, path)? else {
-            return Ok(None);
-        };
-
-        let mut textures = raw_model.textures.unwrap();
-
-        Ok(Some(Self {
-            down: textures.remove("down").unwrap().parse()?,
-            up: textures.remove("up").unwrap().parse()?,
-            north: textures.remove("north").unwrap().parse()?,
-            south: textures.remove("south").unwrap().parse()?,
-            west: textures.remove("west").unwrap().parse()?,
-            east: textures.remove("east").unwrap().parse()?,
-        }))
+        Model::try_fill_from_parent(from_str(&data)?, path)
     }
-}
 
-#[derive(Debug, Deserialize, Clone)]
-struct RawModel {
-    parent: MinecraftResourceIdentifier,
-    textures: Option<HashMap<String, String>>,
-}
-
-impl RawModel {
     pub fn from_namespace(name: MinecraftResourceIdentifier, path: &Path) -> Result<Self> {
         let path = name.into_prefixed_path(path);
         let data = read_to_string(path)?;
@@ -60,28 +58,20 @@ impl RawModel {
     pub fn try_fill_from_parent(mut self, path: &Path) -> Result<Option<Self>> {
         let self_clone = self.clone();
 
-        if path.to_string_lossy().contains("log") {
-            dbg!("here");
-        }
-
-        if path.ends_with("cube.json") {
+        let Some(parent) = self.parent else {
+            dbg!("RETURNED-------------------RETURNED");
             return Ok(Some(self));
-        }
+        };
 
-        let new_model_path = self.parent.into_prefixed_path(path);
+        let new_model_path = parent.clone().into_prefixed_path(path);
         let data = read_to_string(new_model_path)?;
-        let mut new_model: RawModel = from_str(&data)?;
 
-        if new_model.textures.is_none() {
-            new_model.textures = Some(self.textures.clone().unwrap())
-        }
+        let mut new_model: Model = from_str(&data)?;
 
-        new_model
-            .textures
-            .as_mut()
-            .unwrap()
-            .values_mut()
-            .for_each(|x| {
+        dbg!(&new_model);
+
+        new_model.textures.as_mut().map(|x| {
+            x.values_mut().for_each(|x| {
                 if x.starts_with('#') {
                     *x = self
                         .textures
@@ -93,8 +83,27 @@ impl RawModel {
                 }
             });
 
-        let path = new_model.parent.clone().into_path();
+            x
+        });
 
-        new_model.try_fill_from_parent(&path)
+        if let Some(mut elemnts) = self.elements {
+            new_model
+                .elements
+                .as_mut()
+                .unwrap_or(&mut Vec::new())
+                .append(&mut elemnts);
+        }
+
+        if let Some(textures) = self.textures {
+            if let Some(x) = new_model.textures.as_mut() {
+                textures.into_iter().for_each(|(k, v)| {
+                    x.try_insert(k, v);
+                });
+            } else {
+                new_model.textures = Some(textures);
+            }
+        }
+
+        new_model.try_fill_from_parent(path)
     }
 }

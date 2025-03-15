@@ -1,5 +1,5 @@
 #![allow(unused)]
-use model::BlockTextures;
+use model::{BlockTextures, Model};
 pub use resource_identifier::{MinecraftResourceIdentifier, ParseError};
 
 use std::{
@@ -65,7 +65,7 @@ pub fn get_block_texture_map(
         read_blockstates(&asset_path.join(namespace.to_string()), &mut blockstates)?;
     }
 
-    let mut thingies_2: HashMap<MinecraftResourceIdentifier, BlockTextures> = HashMap::new();
+    let mut thingies_2: HashMap<MinecraftResourceIdentifier, Model> = HashMap::new();
 
     for (resource_identifier, block_state) in blockstates.into_iter() {
         let Some(mut variant) = block_state.variants else {
@@ -81,7 +81,7 @@ pub fn get_block_texture_map(
             VariantOptions::Multiple(variants) => variants.first().unwrap().clone(),
         };
 
-        let block_texture = match BlockTextures::from_file(resource_pack_path, variant.model) {
+        let block_texture = match Model::from_file(resource_pack_path, variant.model) {
             Ok(block_texture) => block_texture,
             Err(e) => {
                 warn!(
